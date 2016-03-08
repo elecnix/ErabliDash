@@ -5,6 +5,7 @@ const Promise = require('promise');
 const _ = require('underscore');
 var readFile = Promise.denodeify(fs.readFile);
 var writeFile = Promise.denodeify(fs.writeFile);
+var Series = require('./series.js').Series;
 
 exports.Device = function(id, name, generationId, lastEventSerial) {
   this.id = id;
@@ -67,6 +68,7 @@ exports.Tank = function(attrs) {
   } else {
     throw 'Unsupported tank (shape: ' + self.shape + ', ' + self.orientation + ')';
   }
+  self.series = new Series(60000, 60);
 }
 exports.VacuumSensor = function(attrs) {
   var self = this;
@@ -274,6 +276,7 @@ exports.Dashboard = function(config, WebSocketClient) {
         if (tank.device == device.name) {
           tank.rawValue = data.eData;
           tank.lastUpdatedAt = event.published_at;
+          tank.series.add(data.timestamp, tank.rawValue);
         }
       });
     } else {
@@ -395,6 +398,7 @@ exports.Dashboard = function(config, WebSocketClient) {
         tank = _.extend({}, tank);
         tank.capacity = tank.getCapacity();
         tank.fill = tank.getFill();
+        tank.series = tank.series.getAverages();
         return tank;
       }),
       "valves": valves,
